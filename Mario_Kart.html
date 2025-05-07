@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Mario Kart!</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: linear-gradient(#87CEEB, #6495ED); display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: sans-serif; color: white; }
+        #game-container { position: relative; width: 80vw; height: 60vw; overflow: hidden; background-color: #5cb85c; }
+        .track-segment { position: absolute; background-color: #D3D3D3; border: 5px solid #E0E0E0; border-radius: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
+        .start-line { position: absolute; width: 80px; height: 10px; background-color: lightgreen; border: 2px solid green; z-index: 1; display: flex; justify-content: center; align-items: center; }
+        .finish-line { position: absolute; width: 80px; height: 10px; background-color: lightcoral; border: 2px solid red; z-index: 1; }
+        .player { position: absolute; width: 60px; height: 40px; transform-origin: center center; z-index: 2; }
+        .player-body { background-color: blue; width: 100%; height: 60%; border-radius: 8px; position: absolute; bottom: 0; box-shadow: 2px 2px 5px rgba(0,0,0,0.3); display: flex; justify-content: center; align-items: center; font-size: 0.8em; color: white; }
+        .player-wheels { display: flex; justify-content: space-between; position: absolute; top: 60%; width: 100%; padding: 0 8px; }
+        .wheel { width: 12px; height: 12px; background-color: black; border-radius: 50%; }
+        .item-box { position: absolute; width: 25px; height: 25px; background-color: gold; border: 2px solid orange; box-shadow: 1px 1px 3px rgba(0,0,0,0.2); display: flex; justify-content: center; align-items: center; font-size: 1em; animation: spin 1.5s linear infinite; z-index: 2; }
+        .projectile { position: absolute; width: 20px; height: 20px; border-radius: 50%; z-index: 1; }
+        .green-shell-projectile { background-color: limegreen; border: 2px solid green; }
+        .red-shell-projectile { background-color: red; border: 2px solid darkred; }
+        .banana-placed { position: absolute; width: 20px; height: 20px; background-color: yellow; border: 2px solid orange; border-radius: 10px; z-index: 1; }
+        #score { position: absolute; top: 10px; left: 10px; font-size: 1.5em; z-index: 3; }
+        #message { position: absolute; top: 10px; right: 10px; font-size: 1.2em; font-weight: bold; text-align: right; z-index: 3; }
+        #inventory { position: absolute; top: 40px; left: 10px; font-size: 1em; z-index: 3; }
+        #countdown { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 3em; font-weight: bold; color: white; z-index: 4; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="start-line" style="top: 50%; left: 5%; transform: translateY(-50%); width: 80px;">GO!</div>
+        <div class="finish-line" style="top: 50%; left: 85%; transform: translateY(-50%); width: 80px;"></div>
+
+        <div class="track-segment" style="width: 150px; height: 80px; top: 50%; left: 5%; transform: translateY(-50%);"></div>
+        <div class="track-segment" style="width: 80px; height: 100px; top: 30%; left: 20%; border-radius: 0 15px 15px 0;"></div>
+        <div class="track-segment" style="width: 100px; height: 80px; top: 25%; left: 28%;"></div>
+        <div class="track-segment" style="width: 80px; height: 100px; top: 20%; left: 38%; border-radius: 15px 0 0 15px;"></div>
+        <div class="track-segment" style="width: 150px; height: 80px; top: 25%; left: 46%;"></div>
+        <div class="track-segment" style="width: 80px; height: 100px; top: 30%; left: 61%; border-radius: 0 15px 15px 0;"></div>
+        <div class="track-segment" style="width: 100px; height: 80px; top: 25%; left: 69%;"></div>
+        <div class="track-segment" style="width: 80px; height: 100px; top: 20%; left: 79%; border-radius: 15px 0 0 15px;"></div>
+        <div class="track-segment" style="width: 150px; height: 80px; top: 50%; left: 85%; transform: translateY(-50%);"></div>
+
+        <div class="item-box" style="top: 40%; left: 15%;">?</div>
+        <div class="item-box" style="top: 30%; left: 35%;">?</div>
+        <div class="item-box" style="top: 60%; left: 75%;">?</div>
+
+        <div class="player" id="player-kart">
+            <div class="player-body">Player 1</div>
+            <div class="player-wheels">
+                <div class="wheel"></div>
+                <div class="wheel"></div>
+            </div>
+        </div>
+
+        <div id="score">Score: 0</div>
+        <div id="message"></div>
+        <div id="inventory">Inventory:</div>
+        <div id="countdown"></div>
+    </div>
+
+    <script>
+        const gameContainer = document.getElementById('game-container');
+        const playerKart = document.getElementById('player-kart');
+        const scoreDisplay = document.getElementById('score');
+        const messageDisplay = document.getElementById('message');
+        const inventoryDisplay = document.getElementById('inventory');
+        const countdownDisplay = document.getElementById('countdown');
+        const startLine = document.querySelector('.start-line');
+        const finishLine = document.querySelector('.finish-line');
+        const itemBoxes = Array.from(document.querySelectorAll('.item-box'));
+
+        let playerX = 0;
+        let playerY = 0;
+        let playerAngle = 0;
+        let score = 0;
+        let speed = 0;
+        const moveSpeed = 2;
+        const turnSpeed = 0.05;
+        let isAccelerating = false;
+        let isTurningLeft = false;
+        let isTurningRight = false;
+        const availableItems = ['coin', 'banana', 'green-shell', 'red-shell', 'mushroom'];
+        let currentItem = null;
+        const projectiles = [];
+        const placedBananas = [];
+        let raceStarted = false;
+
+        function setupPlayerStartPosition() {
+            const startRect = startLine.getBoundingClientRect();
+            playerX = startRect.left + startRect.width / 2 - playerKart.offsetWidth / 2;
+            playerY = startRect.top + startRect.height / 2 - playerKart.offsetHeight / 2;
+            playerKart.style.left = `${playerX}px`;
+            playerKart.style.top = `${playerY}px`;
+            playerKart.style.transform = `translate(-50%, -50%) rotate(0deg)`; // Start facing forward (angle 0)
+            playerAngle = 0;
+        }
+
+        function startCountdown() {
+            let count = 3;
+            countdownDisplay.textContent = count;
+            const countdownInterval = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownDisplay.textContent = count;
+                } else if (count === 0) {
+                    countdownDisplay.textContent = "GO!";
+                    raceStarted = true;
+                } else {
+                    countdownDisplay.textContent = "";
+                    clearInterval(countdownInterval);
+                    requestAnimationFrame(updatePlayerPosition); // Start the game loop after countdown
+                }
+            }, 1000);
+        }
+
+        function updatePlayerPosition() {
+            if (!raceStarted) return; // Don't move if the race hasn't started
+
+            if (isAccelerating) {
+                playerX += Math.cos(playerAngle) * moveSpeed;
+                playerY += Math.sin(playerAngle) * moveSpeed;
+            }
+            if (isTurningLeft) {
+                playerAngle -= turnSpeed;
+            }
+            if (isTurningRight) {
+                playerAngle += turnSpeed;
+            }
+
+            playerKart.style.left = `${playerX}px`;
+            playerKart.style.top = `${playerY}px`;
+            playerKart.style.transform = `translate(-50%, -50%) rotate(${playerAngle}rad)`;
+
+            checkFinishLine();
+            updateProjectiles();
+            updateBananas();
+            checkItemBoxCollisions();
+            requestAnimationFrame(updatePlayerPosition);
+        }
+
+        function checkFinishLine() {
+            if (!raceStarted) return;
+
+            const playerRect = playerKart.getBoundingClientRect();
+            const finishRect = finishLine.getBoundingClientRect();
+
+            if (intersects(playerRect, finishRect)) {
+                raceStarted = false;
+                messageDisplay.textContent = "Race Finished!";
+                speed = 0; // Stop the kart
+            }
+        }
+
+        function updateProjectiles() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const projectile = projectiles[i];
+                projectile.x += Math.cos(projectile.angle) * projectile.speed;
+                projectile.y += Math.sin(projectile.angle) * projectile.speed;
+                projectile.element.style.left = `${projectile.x}px`;
+                projectile.element.style.top = `${projectile.y}px`;
+
+                const gameRect = gameContainer.getBoundingClientRect();
+                const projectileRect = projectile.element.getBoundingClientRect();
+                if (!intersects(gameRect, projectileRect)) {
+                    projectile.element.remove();
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateBananas() {
+            for (let i = placedBananas.length - 1; i >= 0; i--) {
+                const banana = placedBananas[i];
+                banana.lifeTime -= 1;
+                if (banana.lifeTime <= 0) {
+                    banana.element.remove();
+                    placedBananas.splice(i, 1);
+                }
+            }
+        }
+
+        function checkItemBoxCollisions() {
+            if (!raceStarted) return;
+
+            itemBoxes.forEach((box, index) => {
+                const boxRect = box.getBoundingClientRect();
+                const playerRect = playerKart.getBoundingClientRect();
+
+                if (intersects(playerRect, boxRect)) {
+                    handleItemBoxPickup(box, index);
+                }
+            });
+        }
+
+        function handleItemBoxPickup(box, index) {
+            box.remove();
+            itemBoxes.splice(index, 1);
+
+            if (currentItem === null) {
+                currentItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+                messageDisplay.textContent = `Got a ${currentItem}! Press Space to use.`;
+                inventoryDisplay.textContent = `Inventory: ${currentItem}`;
+            } else {
+                messageDisplay.textContent = `Inventory full! (Holding ${currentItem})`;
+            }
+        }
+
+        function handleItemUse() {
+            if (!raceStarted) return;
+
+            if (currentItem) {
+                switch (currentItem) {
+                    case 'coin':
+                        score++;
+                        messageDisplay.textContent = "Used a Coin! (Why?)";
+                        break;
+                    case 'banana':
+                        placeBanana();
+                        break;
+                    case 'green-shell':
+                        launchShell('green');
+                        break;
+                    case 'red-shell':
+                        launchShell('red');
+                        break;
+                    case 'mushroom':
+                        speed += 5;
+                        messageDisplay.textContent = "Used a Mushroom Boost!";
+                        setTimeout(() => speed = Math.max(speed - 5, 0), 1500);
+                        break;
+                    default:
+                        messageDisplay.textContent = `Used ${currentItem}!`;
+                }
+                scoreDisplay.textContent = `Score: ${score}`;
+                inventoryDisplay.textContent = `Inventory:`;
+                currentItem = null;
+            } else {
+                messageDisplay.textContent = "No item to use!";
+            }
+        }
+
+        function launchShell(color) {
+            if (!raceStarted) return;
+
+            if (color === 'green' || color === 'red') {
+                const shell = document.createElement('div');
+                shell.classList.add('projectile');
+                shell.classList.add(`${color}-shell-projectile`);
+                shell.x = playerX;
+                shell.y = playerY;
+                shell.angle = playerAngle;
+                shell.speed = 5;
+                gameContainer.appendChild(shell);
+                projectiles.push({ element: shell, x: shell.x, y: shell.y, angle: shell.angle, speed: shell.speed });
+            }
+        }
+
+        function placeBanana() {
+            if (!raceStarted) return;
+
+            const banana = document.createElement('div');
+            banana.classList.add('banana-placed');
+            banana.style.left = `${playerX - 10}px`;
+            banana.style.top = `${playerY + 20}px`;
+            gameContainer.appendChild(banana);
+            placedBananas.push({ element: banana, lifeTime: 300 });
+        }
+
+        function intersects(rect1, rect2) {
+            return rect1.left < rect2.right &&
+                   rect1.right > rect2.left &&
+                   rect1.top < rect2.bottom &&
+                   rect1.bottom > rect2.top;
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowUp') {
+                isAccelerating = true;
+            } else if (event.key === 'ArrowLeft') {
+                isTurningLeft = true;
+            } else if (event.key === 'ArrowRight') {
+                isTurningRight = true;
+            } else if (event.key === ' ') {
+                handleItemUse();
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'ArrowUp') {
+                isAccelerating = false;
+            } else if (event.key === 'ArrowLeft') {
+                isTurningLeft = false;
+            } else if (event.key === 'ArrowRight') {
+                isTurningRight = false;
+            }
+        });
+
+        // Initial setup
+        setupPlayerStartPosition();
+        startCountdown();
+    </script>
+</body>
+</html>
